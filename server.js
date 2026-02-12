@@ -60023,7 +60023,7 @@ var app = (0, import_express.default)();
 import_dotenv.default.config();
 console.log(`Running on ${"prod"} env`);
 app.set("env", "prod");
-var port = _parseInt("8888");
+var port = _parseInt("10000");
 import_assert15.default.ok(port);
 app.use(import_express.default.json());
 app.set("debug", false);
