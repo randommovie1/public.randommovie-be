@@ -1,3 +1,5 @@
-"scripts": {
-  "noop": "echo 'Doing nothing'"
+{
+  "scripts": {
+    "noop": "echo 'Doing nothing'"
+  }
 }
