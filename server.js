@@ -52516,6 +52516,8 @@ var require_country_locale_map = __commonJS({
 // src/server.ts
 var server_exports = {};
 __export(server_exports, {
+  ENV: () => ENV,
+  IS_DEBUG: () => IS_DEBUG,
   app: () => app
 });
 module.exports = __toCommonJS(server_exports);
@@ -52772,10 +52774,10 @@ function config() {
     cookie: {
       httpOnly: true,
       maxAge: 1e3 * 60 * 60 * 24,
-      sameSite: app.get("env") === "prod" ? "none" : "lax"
+      sameSite: ENV === "prod" ? "none" : "lax"
     }
   };
-  if (app.get("env") === "prod") {
+  if (ENV === "prod") {
     import_assert3.default.ok(opts.cookie);
     opts.cookie.secure = true;
   }
@@ -56449,6 +56451,9 @@ var {
 // src/configs/axios.config.ts
 function config3() {
   axios_default.interceptors.request.use((request) => {
+    if (IS_DEBUG) {
+      console.log("Starting Request", JSON.stringify(request, null, 2));
+    }
     return request;
   });
 }
@@ -56801,7 +56806,7 @@ var User = class _User {
 // src/services/movie.service.ts
 var import_assert8 = __toESM(require("assert"));
 
-// src/clients/tmdb/models/search-person-response.model.ts
+// src/clients/tmdb/models/search-person.response.ts
 var Person = class {
   constructor(object) {
     this.id = void 0;
@@ -56837,7 +56842,7 @@ var SearchPersonResponse = class {
   }
 };
 
-// src/clients/tmdb/models/movie-credits-response.model.ts
+// src/clients/tmdb/models/movie-credits.response.ts
 var GetMovieCreditsResponse = class {
   constructor(object) {
     this.id = void 0;
@@ -56851,7 +56856,7 @@ var GetMovieCreditsResponse = class {
   }
 };
 
-// src/clients/tmdb/models/search-keyword-response.model.ts
+// src/clients/tmdb/models/search-keyword.response.ts
 var Keyword = class {
   constructor(object) {
     this.id = void 0;
@@ -56877,7 +56882,7 @@ var SearchKeywordResponse = class {
   }
 };
 
-// src/clients/tmdb/models/movie-providers-response.model.ts
+// src/clients/tmdb/models/movie-providers.response.ts
 var GetMovieProvidersResponse = class {
   constructor(object) {
     this.id = void 0;
@@ -56893,7 +56898,7 @@ var GetMovieProvidersResponse = class {
 // src/clients/tmdb/the-movie-db.client.ts
 var import_assert6 = __toESM(require("assert"));
 
-// src/clients/tmdb/models/movie-videos-response.model.ts
+// src/clients/tmdb/models/movie-videos.response.ts
 var Video = class {
   constructor(obj) {
     this.iso_639_1 = void 0;
@@ -56931,7 +56936,7 @@ var GetMovieVideosResponse = class {
   }
 };
 
-// src/clients/tmdb/models/discover-movie-response.model.ts
+// src/clients/tmdb/models/discover-movie.response.ts
 var TheMovieDbMovie = class {
   constructor(obj) {
     /** Whether the movie is for an adult audience. */
@@ -57028,6 +57033,30 @@ var SearchCriteria = class {
   }
 };
 
+// src/clients/tmdb/models/person-movie-credits.response.ts
+var PersonMovieCreditsResponse = class {
+  constructor(obj) {
+    this.id = 0;
+    this.cast = void 0;
+    this.crew = void 0;
+    if (obj) {
+      this.id = obj.id;
+      this.cast = obj.cast ? obj.cast.map((i) => ({
+        ...new TheMovieDbMovie(i),
+        character: i.character,
+        credit_id: i.credit_id,
+        order: i.order ?? 0
+      })) : void 0;
+      this.crew = obj.crew ? obj.crew.map((i) => ({
+        ...new TheMovieDbMovie(i),
+        credit_id: i.credit_id,
+        department: i.department,
+        job: i.job
+      })) : void 0;
+    }
+  }
+};
+
 // src/clients/tmdb/the-movie-db.client.ts
 var AUTH = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIzMTQwZTczZTBmYjBjM2Y4NDM2NTliZTVkYzgwOGIyOSIsIm5iZiI6MTcyMjg3NDQwNS4zNzEyMiwic3ViIjoiNjZiMGY4N2VmY2QwMTlkODk5ZjQ4ZmYxIiwic2NvcGVzIjpbImFwaV9yZWFkIl0sInZlcnNpb24iOjF9.ALVzLp8MT3l9TkMZhgy0J9E2BWqyDh1Wb-7B0hgzhqY";
 async function getMovieProviders(id) {
@@ -57053,14 +57082,14 @@ async function discoverMovie(params) {
   });
   return new DiscoverMovieResponse(response.data);
 }
-async function doSearchPerson(name, page, role) {
+async function searchPerson(name, page, role) {
   const criteria = new SearchCriteria();
   criteria.name = name;
   criteria.page = page;
   const persons = [];
   let response = void 0;
   for (let i = 0; i < criteria.maxIterations; i++) {
-    response = await doSearchPersonByCriteria(criteria);
+    response = await searchPersonByCriteria(criteria);
     persons.push(...filterPersons(response.results, role));
     if (persons.length >= criteria.minItems) {
       break;
@@ -57070,11 +57099,12 @@ async function doSearchPerson(name, page, role) {
   return {
     data: persons,
     totalItems: persons.length,
+    page,
     currentPage: criteria.page,
     totalPages: void 0
   };
 }
-async function doSearchPersonByCriteria(criteria) {
+async function searchPersonByCriteria(criteria) {
   const response = await axios_default.get("https://api.themoviedb.org/3/search/person", {
     params: {
       query: criteria.name,
@@ -57087,6 +57117,27 @@ async function doSearchPersonByCriteria(criteria) {
     }
   });
   return new SearchPersonResponse(response.data);
+}
+async function searchDirectorMovieIds(id) {
+  const result = [];
+  const movieCredits = await searchPersonMovieCredits(id);
+  if (movieCredits.crew) {
+    const ids = movieCredits.crew.filter((i) => i.job === "Director").map((i) => i.id);
+    result.push(...ids);
+  }
+  return result;
+}
+async function searchPersonMovieCredits(id) {
+  const response = await axios_default.get(`https://api.themoviedb.org/3/person/${id}/movie_credits`, {
+    params: {
+      language: CurrentSession.getInstance().language
+    },
+    headers: {
+      "Authorization": "Bearer " + AUTH,
+      "Accept": "application/json"
+    }
+  });
+  return new PersonMovieCreditsResponse(response.data);
 }
 async function getMovieCredits(id) {
   import_assert6.default.ok(id);
@@ -57131,6 +57182,7 @@ async function doSearchKeywords(name, page) {
   return {
     data: keywords,
     totalItems: keywords.length,
+    page,
     currentPage: response?.page ?? 1,
     totalPages: response?.total_pages
   };
@@ -57173,10 +57225,11 @@ async function getMoviePosterByPath(path) {
   const result = Buffer.from(response.data, "binary").toString("base64");
   return `data:image/png;base64,${result}`;
 }
-async function findMovie(params) {
+async function findMovie(params, ids = []) {
   let result = void 0;
-  let response = await discoverMovie(params);
-  if (response && response.total_results && response.total_results > 0) {
+  const response = await discoverMovie(params);
+  response.results = response.results.filter((i) => !ids.length || ids.includes(i.id));
+  if (response.results.length > 0) {
     const userId = CurrentSession.getInstance().getUserId();
     if (userId) {
       const ignoredMovieIds = await getUserIgnoredMovies(userId).then((res) => res.map((i) => i.externalId));
@@ -57262,7 +57315,7 @@ async function findMoviesToWatchLaterByUserId(userId) {
     "userMoviesToWatchLater" /* USER_MOVIES_TO_WATCH_LATER */
   );
   return result[0].reduce((acc, curr) => {
-    acc.push(curr["movie_id"]);
+    acc.push(Number(curr["movie_id"]));
     return acc;
   }, []);
 }
@@ -57291,7 +57344,7 @@ async function findIgnoredMoviesByUserId(userId) {
     "userIgnoredMovies" /* USER_IGNORED_MOVIES */
   );
   return result[0].reduce((acc, curr) => {
-    acc.push(curr["movie_id"]);
+    acc.push(Number(curr["movie_id"]));
     return acc;
   }, []);
 }
@@ -59695,7 +59748,7 @@ var PATH2 = "keyword";
 function setup3() {
   app.get(`/${PATH2}`, asyncHandler(async (req, res) => {
     const name = req.query.name;
-    const page = req.query.page;
+    const page = Number(req.query.page);
     res.json(await doSearchKeywords(name, page));
   }));
 }
@@ -59766,9 +59819,8 @@ var PATH3 = "movie";
 var MAX_PAGE = 500;
 var MAX_ATTEMPTS = 5;
 function setup4() {
-  const isDebug = app.get("debug");
   app.get(`/${PATH3}`, asyncHandler(async (req, res) => {
-    if (isDebug) {
+    if (IS_DEBUG) {
       const timestamp = (/* @__PURE__ */ new Date()).toISOString();
       console.log(`[DEBUG] <${timestamp}> ${req.sessionID}`);
     }
@@ -59781,13 +59833,19 @@ function setup4() {
       session2.queryParams = new DiscoverMovieParams(queryParams);
       session2.totalPages = (await discoverMovie(queryParams)).total_pages;
     }
+    const directorMovieIds = [];
+    if (session2.queryParams?.with_crew) {
+      directorMovieIds.push(
+        ...await searchDirectorMovieIds(session2.queryParams.with_crew)
+      );
+    }
     let result = null;
     for (let i = 0; i < MAX_ATTEMPTS; i++) {
       queryParams.page = getRandomNumber(session2.totalPages) + 1;
       if (queryParams.page > MAX_PAGE) {
         queryParams.page = getRandomNumber(MAX_PAGE) + 1;
       }
-      let movie = await findMovie(queryParams);
+      const movie = await findMovie(queryParams, directorMovieIds);
       if (movie) {
         const details = await getMovieDetails(movie.id);
         result = fromTheMovieDbToMovieDto(details);
@@ -59796,7 +59854,7 @@ function setup4() {
       i++;
     }
     if (result === null) {
-      if (isDebug) {
+      if (IS_DEBUG) {
         const timestamp = (/* @__PURE__ */ new Date()).toISOString();
         console.log(`[DEBUG] <${timestamp}> No movies found! Max attempts: ${MAX_ATTEMPTS}.`);
       }
@@ -59858,7 +59916,8 @@ function setup4() {
     res.json(response);
   }));
   app.get(`/${PATH3}/watch-later`, authFilter, asyncHandler(async (req, res) => {
-    const movies = await getUserMoviesToWatchLater(req.session.userId, true);
+    const userId = Number(req.session.userId);
+    const movies = await getUserMoviesToWatchLater(userId, true);
     res.json(movies.map((i) => toDto(i)));
   }));
   app.put(`/${PATH3}/watch-later`, authFilter, asyncHandler(async (req, res) => {
@@ -59874,7 +59933,8 @@ function setup4() {
     res.sendStatus(import_http_status_codes2.StatusCodes.OK);
   }));
   app.get(`/${PATH3}/ignore`, authFilter, asyncHandler(async (req, res) => {
-    const movies = await getUserIgnoredMovies(req.session.userId, true);
+    const userId = Number(req.session.userId);
+    const movies = await getUserIgnoredMovies(userId, true);
     res.json(movies.map((i) => toDto(i)));
   }));
   app.put(`/${PATH3}/ignore`, authFilter, asyncHandler(async (req, res) => {
@@ -59896,9 +59956,9 @@ var PATH4 = "person";
 function setup5() {
   app.get(`/${PATH4}`, asyncHandler(async (req, res) => {
     const name = req.query.name;
-    const page = req.query.page;
+    const page = Number(req.query.page);
     const role = req.query.role;
-    const result = await doSearchPerson(name, _parseInt(page) ?? 1, role);
+    const result = await searchPerson(name, page, role);
     res.json(result);
   }));
 }
@@ -60021,12 +60081,12 @@ function errorHandler(err, req, res, next) {
 // src/server.ts
 var app = (0, import_express.default)();
 import_dotenv.default.config();
-console.log(`Running on ${"prod"} env`);
-app.set("env", "prod");
+var ENV = "prod";
+var IS_DEBUG = false;
+console.log(`Running on ${ENV} env`);
 var port = _parseInt("10000");
 import_assert15.default.ok(port);
 app.use(import_express.default.json());
-app.set("debug", false);
 config3();
 config();
 config2();
@@ -60045,7 +60105,7 @@ app.use(errorHandler);
 if (stringToBoolean("false") && stringToBoolean("false")) {
   dropAndCreate().then(() => doMigrations());
 }
-if (app.get("env") === "prod") {
+if (ENV === "prod") {
   app.enable("trust proxy");
 }
 app.listen(port, () => {
@@ -60053,6 +60113,8 @@ app.listen(port, () => {
 });
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
+  ENV,
+  IS_DEBUG,
   app
 });
 /*! Bundled license information:
