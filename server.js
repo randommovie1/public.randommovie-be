@@ -52601,7 +52601,7 @@ var CurrentSession = class _CurrentSession {
     return this._session?.country ?? "US";
   }
   get language() {
-    return this._session?.language ?? "us-US";
+    return this._session?.language ?? "en-US";
   }
 };
 
@@ -57063,7 +57063,7 @@ async function getMovieProviders(id) {
   import_assert6.default.ok(id);
   const response = await axios_default.get(`https://api.themoviedb.org/3/movie/${id}/watch/providers`, {
     params: {
-      language: CurrentSession.getInstance().country
+      language: CurrentSession.getInstance().language
     },
     headers: {
       "Authorization": "Bearer " + AUTH,
@@ -57152,11 +57152,11 @@ async function getMovieCredits(id) {
   });
   return new GetMovieCreditsResponse(response.data);
 }
-async function getMovieDetails(id) {
+async function getMovieDetails(id, lang) {
   import_assert6.default.ok(id);
   const response = await axios_default.get(`https://api.themoviedb.org/3/movie/${id}`, {
     params: {
-      language: CurrentSession.getInstance().language
+      language: lang ?? CurrentSession.getInstance().language
     },
     headers: {
       "Authorization": "Bearer " + AUTH,
@@ -57201,11 +57201,11 @@ async function doSearchKeywordsByCriteria(criteria) {
   });
   return new SearchKeywordResponse(response.data);
 }
-async function getMovieVideos(id) {
+async function getMovieVideos(id, lang) {
   import_assert6.default.ok(id);
   const response = await axios_default.get(`https://api.themoviedb.org/3/movie/${id}/videos`, {
     params: {
-      language: CurrentSession.getInstance().language
+      language: lang ?? CurrentSession.getInstance().language
     },
     headers: {
       "Authorization": "Bearer " + AUTH,
@@ -59676,17 +59676,9 @@ function interceptor(req, res, next) {
     currentSession.session = req.session;
   }
   const country = req.headers["country"];
-  if (country !== void 0) {
-    currentSession.session.country = country;
-  } else {
-    currentSession.session.country = void 0;
-  }
+  currentSession.session.country = country ?? void 0;
   const language = req.headers["language"];
-  if (language !== void 0) {
-    currentSession.session.language = language;
-  } else {
-    currentSession.session.language = void 0;
-  }
+  currentSession.session.language = language ?? void 0;
   if (req.method !== "OPTIONS") {
     console.log(`${req.method} ${req.url}`);
   }
@@ -59848,6 +59840,13 @@ function setup4() {
       const movie = await findMovie(queryParams, directorMovieIds);
       if (movie) {
         const details = await getMovieDetails(movie.id);
+        if (details.overview === "") {
+          const fallback = await getMovieDetails(
+            movie.id,
+            "en-US"
+          );
+          details.overview = fallback.overview;
+        }
         result = fromTheMovieDbToMovieDto(details);
         break;
       }
@@ -59864,37 +59863,15 @@ function setup4() {
   app.get(`/${PATH3}/:movieId/details`, asyncHandler(async (req, res) => {
     const movieId = parseInt(req.params["movieId"]);
     import_assert13.default.ok(movieId);
-    const movie = fromTheMovieDbToMovieDto(await getMovieDetails(movieId));
-    res.json(movie);
-  }));
-  app.get(`/${PATH3}/mock`, asyncHandler(async (req, res) => {
-    res.json({
-      "external_id": 306,
-      "genres": [
-        {
-          "id": 28,
-          "name": "Azione"
-        },
-        {
-          "id": 35,
-          "name": "Commedia"
-        },
-        {
-          "id": 80,
-          "name": "Crime"
-        }
-      ],
-      "original_title": "Beverly Hills Cop III",
-      "overview": "Il detective Axel Foley st\xE0 indagando su un traffico di macchine rubate quando scopre qualcosa di molto molto grosso.",
-      "popularity": 41.405,
-      "poster_path": "/cOPMgeww6hdlg09vcTYGh0FjbJD.jpg",
-      "release_date": "1994-05-24T00:00:00.000Z",
-      "runtime": 105,
-      "title": "Beverly Hills Cop III - Un piedipiatti a Beverly Hills III",
-      "vote_average": 5.9,
-      "vote_count": 1845,
-      "watchLater": false
-    });
+    const movie = await getMovieDetails(movieId);
+    if (movie.overview === "") {
+      const fallback = await getMovieDetails(
+        movieId,
+        "en-US"
+      );
+      movie.overview = fallback.overview;
+    }
+    res.json(fromTheMovieDbToMovieDto(movie));
   }));
   app.get(`/${PATH3}/:movieId/providers`, asyncHandler(async (req, res) => {
     const movieId = parseInt(req.params["movieId"]);
@@ -59909,11 +59886,12 @@ function setup4() {
   }));
   app.get(`/${PATH3}/:movieId/videos`, asyncHandler(async (req, res) => {
     const movieId = parseInt(req.params["movieId"]);
-    let response = await getMovieVideos(movieId);
-    if (response.results != void 0 && response.results.length === 0) {
-      response = await getMovieVideos(movieId);
+    import_assert13.default.ok(movieId);
+    let video = await getMovieVideos(movieId);
+    if (video.results?.length === 0) {
+      video = await getMovieVideos(movieId, "en-US");
     }
-    res.json(response);
+    res.json(video);
   }));
   app.get(`/${PATH3}/watch-later`, authFilter, asyncHandler(async (req, res) => {
     const userId = Number(req.session.userId);
