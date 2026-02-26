@@ -56843,7 +56843,7 @@ var SearchPersonResponse = class {
 };
 
 // src/clients/tmdb/models/movie-credits.response.ts
-var GetMovieCreditsResponse = class {
+var MovieCreditsResponse = class {
   constructor(object) {
     this.id = void 0;
     this.cast = [];
@@ -56882,8 +56882,8 @@ var SearchKeywordResponse = class {
   }
 };
 
-// src/clients/tmdb/models/movie-providers.response.ts
-var GetMovieProvidersResponse = class {
+// src/clients/tmdb/models/watch-providers.response.ts
+var WatchProvidersResponse = class {
   constructor(object) {
     this.id = void 0;
     // ISO 3166-1 alpha-2
@@ -56925,7 +56925,7 @@ var Video = class {
     }
   }
 };
-var GetMovieVideosResponse = class {
+var MovieVideosResponse = class {
   constructor(obj) {
     this.id = void 0;
     this.results = void 0;
@@ -57057,9 +57057,19 @@ var PersonMovieCreditsResponse = class {
   }
 };
 
+// src/clients/tmdb/models/movie-providers.response.ts
+var MovieProvidersResponse = class {
+  constructor(obj) {
+    this.results = void 0;
+    if (obj) {
+      this.results = obj.results?.map((i) => i) ?? void 0;
+    }
+  }
+};
+
 // src/clients/tmdb/the-movie-db.client.ts
 var AUTH = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIzMTQwZTczZTBmYjBjM2Y4NDM2NTliZTVkYzgwOGIyOSIsIm5iZiI6MTcyMjg3NDQwNS4zNzEyMiwic3ViIjoiNjZiMGY4N2VmY2QwMTlkODk5ZjQ4ZmYxIiwic2NvcGVzIjpbImFwaV9yZWFkIl0sInZlcnNpb24iOjF9.ALVzLp8MT3l9TkMZhgy0J9E2BWqyDh1Wb-7B0hgzhqY";
-async function getMovieProviders(id) {
+async function getMovieWatchProviders(id) {
   import_assert6.default.ok(id);
   const response = await axios_default.get(`https://api.themoviedb.org/3/movie/${id}/watch/providers`, {
     params: {
@@ -57070,7 +57080,7 @@ async function getMovieProviders(id) {
       "accept": "application/json"
     }
   });
-  return new GetMovieProvidersResponse(response.data);
+  return new WatchProvidersResponse(response.data);
 }
 async function discoverMovie(params) {
   const response = await axios_default.get("https://api.themoviedb.org/3/discover/movie", {
@@ -57150,7 +57160,7 @@ async function getMovieCredits(id) {
       "Accept": "application/json"
     }
   });
-  return new GetMovieCreditsResponse(response.data);
+  return new MovieCreditsResponse(response.data);
 }
 async function getMovieDetails(id, lang) {
   import_assert6.default.ok(id);
@@ -57212,7 +57222,7 @@ async function getMovieVideos(id, lang) {
       "Accept": "application/json"
     }
   });
-  return new GetMovieVideosResponse(response.data);
+  return new MovieVideosResponse(response.data);
 }
 async function getMoviePosterByPath(path) {
   import_assert6.default.ok(path);
@@ -57244,6 +57254,22 @@ async function findMovie(params, ids = []) {
     }
   }
   return result;
+}
+async function getCountryProviders(country, lang) {
+  import_assert6.default.ok(country);
+  const response = await axios_default.get(`https://api.themoviedb.org/3/watch/providers/movie`, {
+    params: {
+      language: lang ?? CurrentSession.getInstance().language,
+      watch_region: country
+      // ISO 3166-1 alpha-2
+    },
+    headers: {
+      "Authorization": "Bearer " + AUTH,
+      "Accept": "application/json"
+    }
+  });
+  const data = new MovieProvidersResponse(response.data);
+  return data.results?.map((p) => ({ id: p.provider_id, name: p.provider_name })) ?? [];
 }
 function filterPersons(persons, by) {
   return persons.filter((person) => person.known_for_department === by).filter((person) => person.popularity && person.popularity > 1).sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
@@ -59839,16 +59865,38 @@ function setup4() {
       }
       const movie = await findMovie(queryParams, directorMovieIds);
       if (movie) {
-        const details = await getMovieDetails(movie.id);
-        if (details.overview === "") {
-          const fallback = await getMovieDetails(
-            movie.id,
-            "en-US"
-          );
-          details.overview = fallback.overview;
+        let searchMovieDetails = true;
+        if (queryParams.with_watch_providers) {
+          searchMovieDetails = false;
+          const searchProviders = queryParams.with_watch_providers.split("|").map((id) => parseInt(id));
+          const providersPlain = queryParams.with_watch_monetization_types.split("|");
+          const country = queryParams.watch_region ?? CurrentSession.getInstance().country;
+          const providers = await getMovieWatchProviders(movie.id);
+          if (providers.results) {
+            const countryProviders = providers.results.get(country);
+            if (countryProviders) {
+              for (let i2 = 0; i2 < providersPlain.length; i2++) {
+                const ids = countryProviders[providersPlain[i2]].map((p) => p.provider_id ?? -1);
+                if (ids.some((i3) => searchProviders.includes(i3))) {
+                  searchMovieDetails = true;
+                  break;
+                }
+              }
+            }
+          }
         }
-        result = fromTheMovieDbToMovieDto(details);
-        break;
+        if (searchMovieDetails) {
+          const details = await getMovieDetails(movie.id);
+          if (details.overview === "") {
+            const fallback = await getMovieDetails(
+              movie.id,
+              "en-US"
+            );
+            details.overview = fallback.overview;
+          }
+          result = fromTheMovieDbToMovieDto(details);
+          break;
+        }
       }
       i++;
     }
@@ -59875,7 +59923,7 @@ function setup4() {
   }));
   app.get(`/${PATH3}/:movieId/providers`, asyncHandler(async (req, res) => {
     const movieId = parseInt(req.params["movieId"]);
-    const response = await getMovieProviders(movieId);
+    const response = await getMovieWatchProviders(movieId);
     const country = CurrentSession.getInstance().country;
     res.json(response.results?.get(country) ?? null);
   }));
@@ -60034,6 +60082,15 @@ function setup10() {
   }));
 }
 
+// src/rest/provider.rest.ts
+var PATH10 = "provider";
+function setup11() {
+  app.get(`/${PATH10}/:country`, asyncHandler(async (req, res) => {
+    const country = req.params.country;
+    res.json(await getCountryProviders(country));
+  }));
+}
+
 // src/server.ts
 var import_assert15 = __toESM(require("assert"));
 
@@ -60079,6 +60136,7 @@ setup7();
 setup8();
 setup9();
 setup10();
+setup11();
 app.use(errorHandler);
 if (stringToBoolean("false") && stringToBoolean("false")) {
   dropAndCreate().then(() => doMigrations());
