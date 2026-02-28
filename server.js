@@ -59866,7 +59866,7 @@ function setup4() {
       }
       const movie = await findMovie(queryParams, directorMovieIds);
       if (movie) {
-        let searchMovieDetails = false;
+        let searchMovieDetails = true;
         const providers = await getMovieWatchProviders(movie.id);
         const country = queryParams.watch_region ?? CurrentSession.getInstance().country;
         const providersPlain = queryParams.with_watch_monetization_types?.split("|") ?? void 0;
