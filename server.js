@@ -59872,11 +59872,14 @@ function setup4() {
         const providersPlain = queryParams.with_watch_monetization_types?.split("|") ?? void 0;
         const searchProviders = queryParams.with_watch_providers?.split("|").map((id) => parseInt(id)) ?? void 0;
         const countryProviders = providers.results?.get(country) ?? void 0;
-        for (let i2 = 0; i2 < providersPlain?.length; i2++) {
-          const ids = countryProviders ? countryProviders[providersPlain[i2]].map((p) => p.provider_id ?? -1).filter((i3) => i3 !== -1) : [];
-          searchMovieDetails = searchProviders ? ids.some((i3) => searchProviders.includes(i3)) : ids.length > 0;
-          if (searchMovieDetails) {
-            break;
+        searchMovieDetails = countryProviders !== void 0;
+        if (providersPlain && countryProviders) {
+          for (let i2 = 0; i2 < providersPlain.length; i2++) {
+            const ids = countryProviders[providersPlain[i2]].map((p) => p.provider_id ?? -1).filter((i3) => i3 !== -1);
+            searchMovieDetails = searchProviders ? ids.some((i3) => searchProviders.includes(i3)) : ids.length > 0;
+            if (searchMovieDetails) {
+              break;
+            }
           }
         }
         if (searchMovieDetails) {
