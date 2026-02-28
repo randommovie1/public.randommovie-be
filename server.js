@@ -52517,6 +52517,7 @@ var require_country_locale_map = __commonJS({
 var server_exports = {};
 __export(server_exports, {
   ENV: () => ENV,
+  IS_AXIOS_DEBUG: () => IS_AXIOS_DEBUG,
   IS_DEBUG: () => IS_DEBUG,
   VERSION: () => VERSION3,
   app: () => app
@@ -56452,7 +56453,7 @@ var {
 // src/configs/axios.config.ts
 function config3() {
   axios_default.interceptors.request.use((request) => {
-    if (IS_DEBUG) {
+    if (IS_AXIOS_DEBUG) {
       console.log("Starting Request", JSON.stringify(request, null, 2));
     }
     return request;
@@ -59836,7 +59837,7 @@ var DiscoverMovieParams = class {
 // src/rest/movie.rest.ts
 var PATH3 = "movie";
 var MAX_PAGE = 500;
-var MAX_ATTEMPTS = 5;
+var MAX_ATTEMPTS = 32;
 function setup4() {
   app.get(`/${PATH3}`, asyncHandler(async (req, res) => {
     if (IS_DEBUG) {
@@ -59860,6 +59861,9 @@ function setup4() {
     }
     let result = null;
     for (let i = 0; i < MAX_ATTEMPTS; i++) {
+      if (IS_DEBUG) {
+        console.log(`--> Attempt n\xB0${i + 1}`);
+      }
       queryParams.page = getRandomNumber(session2.totalPages) + 1;
       if (queryParams.page > MAX_PAGE) {
         queryParams.page = getRandomNumber(MAX_PAGE) + 1;
@@ -60141,6 +60145,7 @@ import_dotenv.default.config();
 var ENV = "prod";
 var VERSION3 = "1.0.1";
 var IS_DEBUG = false;
+var IS_AXIOS_DEBUG = false;
 console.log(TAG(VERSION3));
 console.log(`--> ${ENV?.toUpperCase()}`);
 var port = _parseInt("10000");
@@ -60174,6 +60179,7 @@ app.listen(port, () => {
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   ENV,
+  IS_AXIOS_DEBUG,
   IS_DEBUG,
   VERSION,
   app
