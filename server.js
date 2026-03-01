@@ -59879,7 +59879,8 @@ function setup4() {
         searchMovieDetails = countryProviders !== void 0;
         if (providersPlain && countryProviders) {
           for (let i2 = 0; i2 < providersPlain.length; i2++) {
-            const ids = countryProviders[providersPlain[i2]].map((p) => p.provider_id ?? -1).filter((i3) => i3 !== -1);
+            const providers2 = countryProviders[providersPlain[i2]];
+            const ids = providers2?.map((p) => p.provider_id ?? -1).filter((i3) => i3 !== -1) ?? [];
             searchMovieDetails = searchProviders ? ids.some((i3) => searchProviders.includes(i3)) : ids.length > 0;
             if (searchMovieDetails) {
               break;
@@ -59899,7 +59900,6 @@ function setup4() {
           break;
         }
       }
-      i++;
     }
     if (result === null) {
       if (IS_DEBUG) {
@@ -60143,7 +60143,7 @@ var TAG = function(version) {
 var app = (0, import_express.default)();
 import_dotenv.default.config();
 var ENV = "prod";
-var VERSION3 = "1.0.1";
+var VERSION3 = "1.0.2";
 var IS_DEBUG = false;
 var IS_AXIOS_DEBUG = false;
 console.log(TAG(VERSION3));
