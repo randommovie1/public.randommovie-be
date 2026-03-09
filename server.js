@@ -52788,8 +52788,9 @@ function config() {
 
 // src/configs/cors.config.ts
 function config2() {
+  const allowDomains = "https://randommovie.it,https://www.randommovie.it"?.split(",") ?? [];
   app.use((req, res, next) => {
-    res.header("Access-Control-Allow-Origin", "https://randommovie.it");
+    res.header("Access-Control-Allow-Origin", allowDomains);
     res.header("Access-Control-Allow-Credentials", "true");
     res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
     res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, Country, Language");
@@ -59862,7 +59863,6 @@ function setup4() {
     let result = null;
     for (let i = 0; i < MAX_ATTEMPTS; i++) {
       if (IS_DEBUG) {
-        console.log(`--> Attempt n\xB0${i + 1}`);
       }
       queryParams.page = getRandomNumber(session2.totalPages) + 1;
       if (queryParams.page > MAX_PAGE) {
