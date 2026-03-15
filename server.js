@@ -59861,8 +59861,6 @@ function setup4() {
     }
     let result = null;
     for (let i = 0; i < MAX_ATTEMPTS; i++) {
-      if (IS_DEBUG) {
-      }
       queryParams.page = getRandomNumber(session2.totalPages) + 1;
       if (queryParams.page > MAX_PAGE) {
         queryParams.page = getRandomNumber(MAX_PAGE) + 1;
@@ -60142,7 +60140,7 @@ var TAG = function(version) {
 var app = (0, import_express.default)();
 import_dotenv.default.config();
 var ENV = "prod";
-var VERSION3 = "1.0.2";
+var VERSION3 = "1.0.3";
 var IS_DEBUG = false;
 var IS_AXIOS_DEBUG = false;
 console.log(TAG(VERSION3));
